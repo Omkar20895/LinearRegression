@@ -1,63 +1,60 @@
 import numpy as np
 import pandas as pd
+from math import sqrt
 import matplotlib as plt
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression as LinearReg
 
 class LinearRegression():
 
     weights = list()
-    alpha = 0.000001
+    learning_rate = 0.01
    
-    def get_data(self, data_frame, Y, X):
+    def get_data(self, data_frame, Y, X, test_split):
         features = pd.DataFrame()
 
         predictor = data_frame[Y]
         for index in range(0, len(X)):
             features[X[index]] = data_frame[X[index]]
 
-        return predictor, features
+        Xtrain, Xtest, Ytrain, Ytest = train_test_split(features,predictor,test_size=test_split,random_state=0)
+        
+        return Xtrain, Ytrain, Xtest, Ytest
 
     def optimize_weights(self, predictor, features):
-        diff = 10
         iterations = 10000
+        features["ones"] = np.ones(features.shape[0], dtype=int)
         while(iterations):
-            total_sum = np.zeros(len(features.index))
-            feature_sum = 0
-            for index in range(0, len(self.weights)-1):
-                total_sum += features[features.columns[index]] * self.weights[index]
-            total_sum += np.ones(len(features.index)) * self.weights[-1]
-            error_diff = predictor - total_sum
-            
-            for index in range(0, len(self.weights)-1):
-                partial_diff = error_diff.dot(features[features.columns[index]])
-                partial_diff_sum = partial_diff.sum()
-                partial_diff = partial_diff_sum/float(len(features.index))
-                self.weights[index] = self.weights[index] - self.alpha*partial_diff_sum
+            predicted_target = features.dot(self.weights)
+            actual_target = predictor
+           
+            # Calculating X.T * (Hypothesis - Actual) 
+            partial_diff = features.T.dot(predicted_target - actual_target)/features.shape[0]
 
-            self.weights[-1] = self.weights[-1] - self.alpha*(error_diff.sum()/float(len(features.index)))
-            print(self.weights)
-            iterations -= 1
-    
-    def train_linear_model(self, df, Y, X):
-        predictor, features = self.get_data(df, Y, X) 
-        self.weights = list(np.random.randn(len(X)+1))
+            for i in range(len(self.weights)):
+                self.weights[i] = self.weights[i] - self.learning_rate * partial_diff[i]
+            #print(self.weights)
+            iterations -=1
+   
+    ## Take learning rate also as an argument 
+    def train_linear_model(self, predictor, features, learning_rate=0.01):
+        print("Training the linear model...")
+        self.weights = list(np.random.randn(features.shape[1] + 1))
+        self.learning_rate = learning_rate
 
         self.optimize_weights(predictor, features)
-        #self.optimize_weights(predictor, explanator)
     
-    def get_predictions(self):
-        print("getting individual data points")
+    def get_predictions(self, features):
+        features["ones"] = np.ones(features.shape[0], dtype=int)
+        predictions = features.dot(self.weights)
+ 
+        return predictions
         
-    def get_individual_predictions(self, kwargs):
-        result = 0
-        
-        for index in range(0, len(kwargs)):
-            result += weights[index]*kwargs[index]
-        
-        result += weights[-1]
-        
-        return result
+    def rmse(self, predictor, features):
+        predicted_values = self.get_predictions(features)
+        actual_values = predictor
 
-data_frame = pd.DataFrame(np.random.randint(0, 100, size=(100, 2)), columns=["X", "Y"])
-
-LR = LinearRegression()
-LR.train_linear_model(data_frame, "Y", ["X"])
+        rmse = (predicted_values-actual_values)**2
+        rmse = sqrt(rmse.sum()/features.shape[0])
+        return rmse
